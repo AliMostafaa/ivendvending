@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import './globals.css';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 export const metadata: Metadata = {
     title: 'Vending Machine Planner',
@@ -12,7 +14,11 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en">
-            <body>{children}</body>
+            <body className="bg-background text-text antialiased">
+                <ErrorBoundary>
+                    {children}
+                </ErrorBoundary>
+            </body>
         </html>
     );
 }
