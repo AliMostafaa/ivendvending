@@ -114,11 +114,18 @@ export default function VendingMachine() {
                                 alt="Vending Machine"
                                 className="w-full h-auto rounded-xl shadow-machine"
                             />
-                            <div className="absolute inset-0 pointer-events-none">
+                            <div className="absolute inset-0">
                                 <div
-                                    className="absolute top-24 left-14 w-80 h-96 grid grid-rows-6 gap-1.5"
+                                    className="absolute pointer-events-auto"
                                     style={{
+                                        top: '15%',
+                                        left: '10%',
+                                        width: '80%',
+                                        height: '75%',
+                                        display: 'grid',
+                                        gridTemplateRows: `repeat(${GRID_CONFIG.rows}, 1fr)`,
                                         gridTemplateColumns: `repeat(${GRID_CONFIG.cols}, 1fr)`,
+                                        gap: '2px',
                                     }}
                                 >
                                     {getGridCells(grid, products, selectedProduct, null).map((row, r) =>

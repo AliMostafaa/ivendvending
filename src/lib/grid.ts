@@ -56,7 +56,13 @@ export const getProductAt = (
     products: ProductData[],
     position: GridPosition
 ): ProductData | undefined => {
-    return products.find(p => p.r === position.r && p.c === position.c);
+    // Find product that occupies this position (including multi-cell products)
+    return products.find(p => {
+        // Check if the position is within the product's occupied cells
+        if (p.r !== position.r) return false;
+        // Product occupies cells from p.c to p.c + p.size - 1
+        return position.c >= p.c && position.c < p.c + p.size;
+    });
 };
 
 export const moveProduct = (
