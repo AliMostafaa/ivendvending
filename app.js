@@ -298,6 +298,12 @@
         var slot = slotsDiv.querySelector('.slot[data-r="' + r + '"][data-c="' + c + '"]');
         if (slot) {
             slot.appendChild(productEl);
+
+            // Set width to span multiple slots
+            if (size > 1) {
+                productEl.style.width = (size * 100) + '%';
+                productEl.style.left = '0';
+            }
         }
 
         // Update grid
@@ -451,6 +457,12 @@
                     var slot = slotsDiv.querySelector('.slot[data-r="' + p.r + '"][data-c="' + p.c + '"]');
                     if (slot) {
                         slot.appendChild(productEl);
+
+                        // Set width to span multiple slots
+                        if (p.size > 1) {
+                            productEl.style.width = (p.size * 100) + '%';
+                            productEl.style.left = '0';
+                        }
                     }
 
                     for (var i = 0; i < p.size; i++) {
