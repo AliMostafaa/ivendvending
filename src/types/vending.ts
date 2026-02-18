@@ -44,3 +44,35 @@ export interface ProductPlacement {
     size: number;
     position: GridPosition;
 }
+
+// New types for the improved system
+export interface ProductSlotState {
+    id: string;
+    product: string;
+    size: number;
+    r: number;
+    c: number;
+    isSelected: boolean;
+    isHovered: boolean;
+}
+
+export interface GridCell {
+    row: number;
+    col: number;
+    occupiedBy: string | null;
+    isDragTarget: boolean;
+    isPlacementValid: boolean;
+}
+
+export interface PlacementMode {
+    type: 'place' | 'move' | 'delete';
+    product?: string;
+    size?: number;
+    selectedId?: string;
+}
+
+export interface ValidationResult {
+    isValid: boolean;
+    conflicts: Array<{ r: number; c: number; occupiedBy: string }>;
+    message: string;
+}

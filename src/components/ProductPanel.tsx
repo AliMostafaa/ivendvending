@@ -38,19 +38,9 @@ export default function ProductPanel({
                 return (
                     <div
                         key={config.product}
-                        draggable
-                        onDragStart={(e) => {
-                            const data = {
-                                source: 'toolbox' as const,
-                                product: config.product,
-                                size: config.size,
-                            };
-                            e.dataTransfer.setData('application/json', JSON.stringify(data));
-                            e.dataTransfer.effectAllowed = 'copy';
-                        }}
                         onClick={() => handleProductClick(config)}
                         className={`
-                            relative p-3 rounded-lg cursor-grab transition-all duration-200
+                            relative p-3 rounded-lg cursor-pointer transition-all duration-200
                             ${isSelected
                                 ? 'bg-primary-600/20 border-2 border-primary-400 shadow-lg shadow-primary-500/20'
                                 : 'bg-card hover:bg-card/80 border-2 border-transparent'

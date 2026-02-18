@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ProductData, DragData } from '@/types/vending';
-import { createEmptyGrid, canPlaceProduct, getProductAt, moveProduct, addProduct, deleteProduct } from '@/lib/grid';
+import { ProductData, GridCell, ProductPlacement } from '@/types/vending';
+import { createEmptyGrid, getProductAt, getGridCells, addProduct } from '@/lib/grid';
 import { loadLayout, saveLayout } from '@/lib/storage';
 import { GRID_CONFIG, MESSAGES } from '@/lib/constants';
 import ProductSlot from './ProductSlot';
@@ -42,84 +42,6 @@ export default function VendingMachine() {
         }
     };
 
-    const handleSlotClick = (r: number, c: number) => {
-        if (!selectedProduct) return;
-
-        const existingProduct = getProductAt(products, { r, c });
-
-        if (existingProduct) {
-            if (confirm(MESSAGES.CONFIRM_REPLACE)) {
-                // Remove existing product
-                const updatedProducts = deleteProduct(products, existingProduct.id);
-                setProducts(updatedProducts);
-
-                // Update grid
-                const newGrid = deleteProductFromGrid(grid, existingProduct);
-                setGrid(newGrid);
-
-                // Place new product if possible
-                if (canPlaceProduct(newGrid, { r, c }, selectedProduct.size)) {
-                    handleAddProduct(selectedProduct.product, r, c, selectedProduct.size);
-                }
-            }
-        } else {
-            if (canPlaceProduct(grid, { r, c }, selectedProduct.size)) {
-                handleAddProduct(selectedProduct.product, r, c, selectedProduct.size);
-            } else {
-                alert(MESSAGES.CANNOT_PLACE);
-            }
-        }
-    };
-
-    const handleAddProduct = (product: string, r: number, c: number, size: number) => {
-        const result = addProduct(products, { product, size, position: { r, c } }, itemCounter);
-        setProducts(result.products);
-        setItemCounter(result.itemCounter);
-
-        const newGrid = createEmptyGrid(GRID_CONFIG.rows, GRID_CONFIG.cols);
-        result.products.forEach(p => {
-            for (let i = 0; i < p.size; i++) {
-                newGrid[p.r][p.c + i] = p.id;
-            }
-        });
-        setGrid(newGrid);
-
-        saveLayout({ products: result.products, itemCounter: result.itemCounter });
-    };
-
-    const handleMoveProduct = (id: string, newR: number, newC: number, size: number) => {
-        const updatedProducts = moveProduct(products, id, { r: newR, c: newC });
-        setProducts(updatedProducts);
-
-        const newGrid = createEmptyGrid(GRID_CONFIG.rows, GRID_CONFIG.cols);
-        updatedProducts.forEach(p => {
-            for (let i = 0; i < p.size; i++) {
-                newGrid[p.r][p.c + i] = p.id;
-            }
-        });
-        setGrid(newGrid);
-
-        saveLayout({ products: updatedProducts, itemCounter });
-    };
-
-    const handleDeleteProduct = (id: string) => {
-        const updatedProducts = deleteProduct(products, id);
-        setProducts(updatedProducts);
-
-        const newGrid = deleteProductFromGrid(grid, products.find(p => p.id === id)!);
-        setGrid(newGrid);
-
-        saveLayout({ products: updatedProducts, itemCounter });
-    };
-
-    const deleteProductFromGrid = (currentGrid: (string | null)[][], product: ProductData): (string | null)[][] => {
-        const newGrid = currentGrid.map(row => [...row]);
-        for (let i = 0; i < product.size; i++) {
-            newGrid[product.r][product.c + i] = null;
-        }
-        return newGrid;
-    };
-
     const handleProductSelect = (product: string, size: number) => {
         if (selectedProduct?.product === product) {
             setSelectedProduct(null);
@@ -128,22 +50,52 @@ export default function VendingMachine() {
         }
     };
 
+    const handleProductPlace = (product: string, r: number, c: number, size: number) => {
+        // Validate placement first
+        const grid = products.reduce((grid, p) => {
+            for (let i = 0; i < p.size; i++) {
+                grid[p.r][p.c + i] = p.id;
+            }
+            return grid;
+        }, Array.from({ length: GRID_CONFIG.rows }, () => Array(GRID_CONFIG.cols).fill(null)));
+
+        // Check bounds
+        if (c + size > GRID_CONFIG.cols || r < 0 || r >= GRID_CONFIG.rows || c < 0) {
+            alert('Cannot place product here - extends beyond grid boundary');
+            return;
+        }
+
+        // Check for conflicts
+        for (let i = 0; i < size; i++) {
+            if (grid[r][c + i] !== null) {
+                alert('Cannot place product here - conflicts with existing item');
+                return;
+            }
+        }
+
+        // Add the product
+        const result = addProduct(products, { product, size, position: { r, c } }, itemCounter);
+        setProducts(result.products);
+        setItemCounter(result.itemCounter);
+
+        // Update grid
+        const newGrid = createEmptyGrid(GRID_CONFIG.rows, GRID_CONFIG.cols);
+        result.products.forEach(p => {
+            for (let i = 0; i < p.size; i++) {
+                newGrid[p.r][p.c + i] = p.id;
+            }
+        });
+        setGrid(newGrid);
+
+        // Save to localStorage
+        saveLayout({ products: result.products, itemCounter: result.itemCounter });
+    };
+
     const handleClearMachine = () => {
         setProducts([]);
         setItemCounter(0);
         initGrid();
         saveLayout({ products: [], itemCounter: 0 });
-    };
-
-    const handleDrop = (e: React.DragEvent, r: number, c: number) => {
-        e.preventDefault();
-        const data = JSON.parse(e.dataTransfer.getData('application/json')) as DragData;
-
-        if (data.source === 'toolbox') {
-            handleAddProduct(data.product!, r, c, data.size);
-        } else if (data.source === 'grid') {
-            handleMoveProduct(data.id!, r, c, data.size);
-        }
     };
 
     return (
@@ -154,9 +106,9 @@ export default function VendingMachine() {
                     <p className="text-muted">Drag items onto the shelves or click to place. Drop in trash to remove.</p>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2">
-                        <div className="relative mx-auto w-full max-w-md">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    <div className="lg:col-span-3">
+                        <div className="relative mx-auto w-full max-w-2xl">
                             <img
                                 src="/images/FullMachineOnlyNew.jpg"
                                 alt="Vending Machine"
@@ -164,22 +116,20 @@ export default function VendingMachine() {
                             />
                             <div className="absolute inset-0 pointer-events-none">
                                 <div
-                                    className="absolute top-24 left-14 w-56 h-96 grid grid-rows-6 gap-1.5"
+                                    className="absolute top-24 left-14 w-80 h-96 grid grid-rows-6 gap-1.5"
                                     style={{
                                         gridTemplateColumns: `repeat(${GRID_CONFIG.cols}, 1fr)`,
                                     }}
                                 >
-                                    {Array.from({ length: GRID_CONFIG.rows }).map((_, r) =>
-                                        Array.from({ length: GRID_CONFIG.cols }).map((_, c) => (
+                                    {getGridCells(grid, products, selectedProduct, null).map((row, r) =>
+                                        row.map((cell, c) => (
                                             <ProductSlot
                                                 key={`${r}-${c}`}
-                                                row={r}
-                                                col={c}
-                                                grid={grid}
+                                                cell={cell}
                                                 products={products}
                                                 selectedProduct={selectedProduct}
-                                                onSlotClick={handleSlotClick}
-                                                onDrop={handleDrop}
+                                                onProductSelect={handleProductSelect}
+                                                onProductPlace={handleProductPlace}
                                             />
                                         ))
                                     )}

@@ -1,108 +1,126 @@
 'use client';
 
 import { useState } from 'react';
-import { ProductData, GridPosition } from '@/types/vending';
-import { canPlaceProduct, getProductAt } from '@/lib/grid';
-import { MESSAGES } from '@/lib/constants';
+import { ProductData, GridCell, ProductConfig } from '@/types/vending';
+import { getProductAt, canPlaceProduct } from '@/lib/grid';
+import { PRODUCT_CONFIGS, MESSAGES } from '@/lib/constants';
 
 interface ProductSlotProps {
-    row: number;
-    col: number;
-    grid: (string | null)[][];
+    cell: GridCell;
     products: ProductData[];
     selectedProduct: { product: string; size: number } | null;
-    onSlotClick: (r: number, c: number) => void;
-    onDrop: (e: React.DragEvent, r: number, c: number) => void;
+    onProductSelect: (product: string, size: number) => void;
+    onProductPlace: (product: string, r: number, c: number, size: number) => void;
 }
 
 export default function ProductSlot({
-    row,
-    col,
-    grid,
+    cell,
     products,
     selectedProduct,
-    onSlotClick,
-    onDrop,
+    onProductSelect,
+    onProductPlace,
 }: ProductSlotProps) {
-    const [isDragOver, setIsDragOver] = useState(false);
-    const productAt = getProductAt(products, { r: row, c: col });
+    const [isHovered, setIsHovered] = useState(false);
 
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragOver(true);
+    const productAt = getProductAt(products, { r: cell.row, c: cell.col });
+    const productConfig = productAt ? PRODUCT_CONFIGS.find(p => p.product === productAt.product) : null;
+
+    // Check if this cell is part of a valid placement area
+    const isValidPlacement = selectedProduct && canPlaceProduct(
+        products.reduce((grid, p) => {
+            for (let i = 0; i < p.size; i++) {
+                grid[p.r][p.c + i] = p.id;
+            }
+            return grid;
+        }, Array.from({ length: 6 }, () => Array(10).fill(null))),
+        { r: cell.row, c: cell.col },
+        selectedProduct.size
+    );
+
+    const handleSlotClick = () => {
+        if (productAt) {
+            // If clicking on an existing product, toggle selection
+            if (selectedProduct?.product === productAt.product) {
+                onProductSelect('', 0);
+            } else {
+                onProductSelect(productAt.product, productAt.size);
+            }
+        } else if (selectedProduct && isValidPlacement) {
+            // Place product if valid
+            onProductPlace(selectedProduct.product, cell.row, cell.col, selectedProduct.size);
+        }
     };
 
-    const handleDragLeave = () => {
-        setIsDragOver(false);
+    const handleProductClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (productAt) {
+            if (selectedProduct?.product === productAt.product) {
+                onProductSelect('', 0);
+            } else {
+                onProductSelect(productAt.product, productAt.size);
+            }
+        }
     };
 
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        setIsDragOver(false);
-        onDrop(e, row, col);
-    };
+    const getSlotStyle = () => {
+        let baseStyle = 'relative rounded-lg transition-all duration-200 cursor-pointer';
 
-    const handleClick = () => {
-        onSlotClick(row, col);
-    };
+        if (productAt) {
+            baseStyle += ' cursor-default';
+        } else if (selectedProduct && isValidPlacement) {
+            baseStyle += ' ring-2 ring-green-400/50 bg-green-400/10';
+        } else if (isHovered) {
+            baseStyle += ' hover:bg-gray-600/30';
+        }
 
-    const canPlace = selectedProduct ? canPlaceProduct(grid, { r: row, c: col }, selectedProduct.size) : false;
+        return baseStyle;
+    };
 
     return (
         <div
-            className={`
-                relative rounded-lg transition-colors duration-200
-                ${productAt ? 'cursor-default' : 'cursor-pointer hover:bg-gray-600/30'}
-                ${isDragOver ? 'bg-green-500/40 border-2 border-white/80 scale-105' : ''}
-                ${!productAt && canPlace && selectedProduct ? 'ring-2 ring-primary-500/50' : ''}
-            `}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={handleClick}
+            className={getSlotStyle()}
+            onClick={handleSlotClick}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
         >
             {productAt && (
-                <ProductItem
-                    product={productAt}
-                    size={productAt.size}
-                    imageSrc={productAt.product === 'coke' ? '/images/coke.png' :
-                        productAt.product === 'chips' ? '/images/chips.png' : '/images/water.png'}
+                <div
+                    className={`
+                        absolute bottom-0 left-0 h-full rounded-lg z-10 overflow-hidden
+                        hover:scale-105 transition-all duration-200
+                    `}
+                    style={{
+                        width: productAt.size > 1 ? `${productAt.size * 100}%` : '100%',
+                    }}
+                    onClick={handleProductClick}
+                >
+                    <img
+                        src={productConfig?.image || '/images/coke.png'}
+                        alt={productAt.product}
+                        className="w-full h-full object-contain"
+                    />
+                    <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+            )}
+
+            {/* Visual indicators */}
+            {!productAt && selectedProduct && isValidPlacement && (
+                <div className="absolute inset-0 border-2 border-dashed border-green-400 rounded-lg pointer-events-none" />
+            )}
+
+            {isHovered && !productAt && !isValidPlacement && (
+                <div className="absolute inset-0 bg-white/10 rounded-lg pointer-events-none" />
+            )}
+
+            {/* Placement preview for multi-cell products */}
+            {!productAt && selectedProduct && isValidPlacement && selectedProduct.size > 1 && (
+                <div
+                    className="absolute bottom-0 left-0 h-full bg-green-400/20 rounded-lg pointer-events-none"
+                    style={{
+                        width: `${selectedProduct.size * 100}%`,
+                    }}
                 />
             )}
-        </div>
-    );
-}
-
-interface ProductItemProps {
-    product: ProductData;
-    size: number;
-    imageSrc: string;
-}
-
-function ProductItem({ product, size, imageSrc }: ProductItemProps) {
-    return (
-        <div
-            className="absolute bottom-0 left-0 h-full rounded-lg z-10 overflow-hidden cursor-grab active:cursor-grabbing hover:scale-105 transition-transform"
-            style={{
-                width: size > 1 ? `${size * 100}%` : '100%',
-            }}
-            draggable
-            onDragStart={(e) => {
-                const data = {
-                    source: 'grid' as const,
-                    id: product.id,
-                    size: product.size,
-                    oldR: product.r,
-                    oldC: product.c,
-                };
-                e.dataTransfer.setData('application/json', JSON.stringify(data));
-            }}
-        >
-            <img
-                src={imageSrc}
-                alt={product.product}
-                className="w-full h-full object-contain"
-            />
         </div>
     );
 }
